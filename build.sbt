@@ -2,15 +2,16 @@ lazy val baseName   = "Lucre-Pi"
 lazy val baseNameL  = baseName.toLowerCase
 lazy val gitProject = "LucrePi"
 
-lazy val projectVersion = "0.1.0-SNAPSHOT"
+lazy val projectVersion = "0.1.0"
 lazy val mimaVersion    = "0.1.0"
 
 // ---- dependencies ----
 
 lazy val deps = new {
   val main = new {
-    val lucre     = "3.17.0"
-    val pi4j      = "1.2"
+    val lucre           = "3.17.6"
+    val soundProcesses  = "3.35.8"
+    val pi4j            = "1.2"
   }
 }
 
@@ -25,9 +26,10 @@ lazy val root = project.withId(baseNameL).in(file("."))
     homepage             := Some(url(s"https://git.iem.at/sciss/$gitProject")),
     licenses             := Seq("AGPL v3+" -> url("http://www.gnu.org/licenses/agpl-3.0.txt")),
     libraryDependencies ++= Seq(
-      "de.sciss"  %% "lucre-expr" % deps.main.lucre,
-      "com.pi4j"  %  "pi4j-core"  % deps.main.pi4j,
-      "de.sciss"  %% "lucre-bdb"  % deps.main.lucre     % Test,
+      "de.sciss"  %% "lucre-expr"           % deps.main.lucre,
+      "de.sciss"  %% "soundprocesses-core"  % deps.main.soundProcesses,
+      "com.pi4j"  %  "pi4j-core"            % deps.main.pi4j,
+      "de.sciss"  %% "lucre-bdb"            % deps.main.lucre     % Test,
     ),
     scalacOptions ++= Seq("-deprecation", "-unchecked", "-feature", "-encoding", "utf8", "-Xlint", "-Xsource:2.13"),
     scalacOptions in (Compile, compile) ++= (if (scala.util.Properties.isJavaAtLeast("9")) Seq("-release", "8") else Nil), // JDK >8 breaks API; skip scala-doc
