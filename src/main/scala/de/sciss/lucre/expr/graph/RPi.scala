@@ -14,20 +14,19 @@
 package de.sciss.lucre.expr.graph
 
 import com.pi4j.io.gpio.{RaspiPin, Pin => JPin}
-import de.sciss.lucre.event.ITargets
+import de.sciss.lucre.expr.Context
 import de.sciss.lucre.expr.graph.impl.MappedIExpr
-import de.sciss.lucre.expr.{Context, IExpr}
-import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.{IExpr, ITargets, Txn}
 import de.sciss.numbers.Implicits._
 
 import scala.annotation.switch
 
 object RPi {
-  private final class ExpandedPin[S <: Sys[S]](index: IExpr[S, Int], tx0: S#Tx)
-                                              (implicit targets: ITargets[S])
-    extends MappedIExpr[S, Int, JPin](index, tx0) {
+  private final class ExpandedPin[T <: Txn[T]](index: IExpr[T, Int], tx0: T)
+                                              (implicit targets: ITargets[T])
+    extends MappedIExpr[T, Int, JPin](index, tx0) {
 
-    protected def mapValue(inValue: Int)(implicit tx: S#Tx): JPin =
+    protected def mapValue(inValue: Int)(implicit tx: T): JPin =
       (inValue.clip(0, 13): @switch) match {
         case  0 => RaspiPin.GPIO_00
         case  1 => RaspiPin.GPIO_01
@@ -74,11 +73,11 @@ object RPi {
   final case class Pin(index: Ex[Int]) extends GPIO.Pin {
     override def productPrefix: String = s"RPi$$Pin" // serialization
 
-    type Repr[S <: Sys[S]] = IExpr[S, JPin]
+    type Repr[T <: Txn[T]] = IExpr[T, JPin]
 
-    protected def mkRepr[S <: Sys[S]](implicit ctx: Context[S], tx: S#Tx): Repr[S] = {
+    protected def mkRepr[T <: Txn[T]](implicit ctx: Context[T], tx: T): Repr[T] = {
       import ctx.targets
-      new ExpandedPin[S](index.expand[S], tx)
+      new ExpandedPin[T](index.expand[T], tx)
     }
   }
 }

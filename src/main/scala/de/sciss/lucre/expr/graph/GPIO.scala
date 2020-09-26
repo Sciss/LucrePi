@@ -16,12 +16,10 @@ package de.sciss.lucre.expr.graph
 import com.pi4j.io.gpio.event.{GpioPinDigitalStateChangeEvent, GpioPinListenerDigital}
 import com.pi4j.io.gpio.{GpioController, GpioFactory, GpioPinDigitalInput, GpioPinDigitalOutput, GpioProvider, PinPullResistance, PinState, Pin => JPin}
 import de.sciss.equal.Implicits._
-import de.sciss.lucre.event.impl.IChangeGenerator
-import de.sciss.lucre.event.{IChangeEvent, IPull, ITargets}
-import de.sciss.lucre.expr.{Context, IControl, IExpr}
-import de.sciss.lucre.stm
-import de.sciss.lucre.stm.TxnLike.peer
-import de.sciss.lucre.stm.{Disposable, Sys}
+import de.sciss.lucre.impl.IChangeGeneratorEvent
+import de.sciss.lucre.{Cursor, Disposable, IChangeEvent, IExpr, IPull, ITargets, Txn}
+import de.sciss.lucre.expr.{Context, IControl}
+import de.sciss.lucre.Txn.peer
 import de.sciss.model.Change
 import de.sciss.synth.proc.SoundProcesses
 
@@ -40,11 +38,11 @@ object GPIO {
     }
   }
 
-  private final class ExpandedDigitalOut[S <: Sys[S]](pin: IExpr[S, JPin], state: IExpr[S, Boolean] /*, tx0: S#Tx*/)
-    extends IControl[S] {
+  private final class ExpandedDigitalOut[T <: Txn[T]](pin: IExpr[T, JPin], state: IExpr[T, Boolean] /*, tx0: T*/)
+    extends IControl[T] {
 
     private[this] val local   = TxnLocal[Boolean](afterCommit = setState)
-    private[this] val obsRef  = Ref(Disposable.empty[S#Tx])
+    private[this] val obsRef  = Ref(Disposable.empty[T])
 
     @volatile
     private[this] var out     = null: GpioPinDigitalOutput
@@ -58,7 +56,7 @@ object GPIO {
       }
     }
 
-    def initControl()(implicit tx: S#Tx): Unit = {
+    def initControl()(implicit tx: T): Unit = {
       val jPin    = pin   .value
       val state0  = state .value
       tx.afterCommit {
@@ -75,7 +73,7 @@ object GPIO {
       obsRef() = obs
     }
 
-    def dispose()(implicit tx: S#Tx): Unit = {
+    def dispose()(implicit tx: T): Unit = {
       obsRef().dispose()
       tx.afterCommit {
         val _out = out
@@ -93,22 +91,22 @@ object GPIO {
     private final case class Impl(pin: Pin, state: Ex[Boolean]) extends DigitalOut {
       override def productPrefix: String = s"GPIO$$DigitalOut" // serialization
 
-      type Repr[S <: Sys[S]] = IControl[S]
+      type Repr[T <: Txn[T]] = IControl[T]
 
-      protected def mkRepr[S <: Sys[S]](implicit ctx: Context[S], tx: S#Tx): Repr[S] = {
-        new ExpandedDigitalOut[S](pin.expand[S], state.expand[S])
+      protected def mkRepr[T <: Txn[T]](implicit ctx: Context[T], tx: T): Repr[T] = {
+        new ExpandedDigitalOut[T](pin.expand[T], state.expand[T])
       }
     }
   }
   /** A pin configured for digital output. The low/high state is specified in the constructor. */
   trait DigitalOut extends Control
 
-  private final class ExpandedDigitalIn[S <: Sys[S]](pin: IExpr[S, JPin], state0: Boolean,
-                                                     pull: IExpr[S, Option[Boolean]],
-                                                     debounce: IExpr[S, Int] /*, tx0: S#Tx*/)
-                                                    (implicit protected val targets: ITargets[S],
-                                                     cursor: stm.Cursor[S])
-    extends IControl[S] with IExpr[S, Boolean] with IChangeGenerator[S, Boolean] {
+  private final class ExpandedDigitalIn[T <: Txn[T]](pin: IExpr[T, JPin], state0: Boolean,
+                                                     pull: IExpr[T, Option[Boolean]],
+                                                     debounce: IExpr[T, Int] /*, tx0: T*/)
+                                                    (implicit protected val targets: ITargets[T],
+                                                     cursor: Cursor[T])
+    extends IControl[T] with IExpr[T, Boolean] with IChangeGeneratorEvent[T, Boolean] {
 
     @volatile
     private[this] var in = null: GpioPinDigitalInput
@@ -123,25 +121,25 @@ object GPIO {
     }
 
     private def setState(now: Boolean): Unit =
-      SoundProcesses.step[S]("GPIO.DigitalIn.handle") { implicit tx =>
+      SoundProcesses.step[T]("GPIO.DigitalIn.handle") { implicit tx =>
         setStateTx(now)
       }
 
-    private def setStateTx(now: Boolean)(implicit tx: S#Tx): Unit = {
+    private def setStateTx(now: Boolean)(implicit tx: T): Unit = {
       val before = valueRef.swap(now)
       if (now != before) {
         fire(Change(before, now))
       }
     }
 
-    def value(implicit tx: S#Tx): Boolean = valueRef()
+    def value(implicit tx: T): Boolean = valueRef()
 
-    override def changed: IChangeEvent[S, Boolean] = this
+    override def changed: IChangeEvent[T, Boolean] = this
 
-    private[lucre] def pullChange(pull: IPull[S])(implicit tx: S#Tx, phase: IPull.Phase): Boolean =
+    private[lucre] def pullChange(pull: IPull[T])(implicit tx: T, phase: IPull.Phase): Boolean =
       pull.resolveExpr(this)
 
-    def initControl()(implicit tx: S#Tx): Unit = {
+    def initControl()(implicit tx: T): Unit = {
       val jPin    = pin     .value
       val pull0   = pull    .value
       val deb0    = debounce.value
@@ -164,7 +162,7 @@ object GPIO {
       }
     }
 
-    def dispose()(implicit tx: S#Tx): Unit = {
+    def dispose()(implicit tx: T): Unit = {
       tx.afterCommit {
         val _in = in
         if (_in != null) {
@@ -202,12 +200,12 @@ object GPIO {
 
       override def productPrefix: String = s"GPIO$$DigitalIn" // serialization
 
-      type Repr[S <: Sys[S]] = IControl[S] with IExpr[S, Boolean]
+      type Repr[T <: Txn[T]] = IControl[T] with IExpr[T, Boolean]
 
-      protected def mkRepr[S <: Sys[S]](implicit ctx: Context[S], tx: S#Tx): Repr[S] = {
+      protected def mkRepr[T <: Txn[T]](implicit ctx: Context[T], tx: T): Repr[T] = {
         import ctx.{cursor, targets}
-        new ExpandedDigitalIn[S](pin.expand[S], pull = pull.expand[S], debounce = debounce.expand[S],
-          state0 = init.expand[S].value)
+        new ExpandedDigitalIn[T](pin.expand[T], pull = pull.expand[T], debounce = debounce.expand[T],
+          state0 = init.expand[T].value)
       }
     }
   }
@@ -215,7 +213,7 @@ object GPIO {
     * as low (`false`) or high (`true`).
     */
   trait DigitalIn extends Control with Ex[Boolean] {
-    type Repr[S <: Sys[S]] <: IControl[S] with IExpr[S, Boolean]
+    type Repr[T <: Txn[T]] <: IControl[T] with IExpr[T, Boolean]
   }
 
   trait Pin extends Ex[JPin]

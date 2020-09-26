@@ -19,7 +19,7 @@ To use the library in your project:
 
     "de.sciss" %% "lucrepi" % v
 
-The current version `v` is `"0.1.0"`.
+The current version `v` is `"1.0.0"`.
 
 ## contributing
 
