@@ -13,13 +13,13 @@ with absolutely no warranties. To contact the author, send an email to `contact 
 
 ## requirements / building
 
-This project compiles against Scala 2.13, 2.12 using sbt.
+This project builds with sbt against Scala 2.13, 2.12.
 
 To use the library in your project:
 
     "de.sciss" %% "lucrepi" % v
 
-The current version `v` is `"1.0.0"`.
+The current version `v` is `"1.1.0"`.
 
 ## contributing
 
