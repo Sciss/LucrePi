@@ -16,12 +16,12 @@ package de.sciss.lucre.expr.graph
 import com.pi4j.io.gpio.event.{GpioPinDigitalStateChangeEvent, GpioPinListenerDigital}
 import com.pi4j.io.gpio.{GpioController, GpioFactory, GpioPinDigitalInput, GpioPinDigitalOutput, GpioProvider, PinPullResistance, PinState, Pin => JPin}
 import de.sciss.equal.Implicits._
+import de.sciss.lucre.Txn.peer
+import de.sciss.lucre.expr.{Context, IControl}
 import de.sciss.lucre.impl.IChangeGeneratorEvent
 import de.sciss.lucre.{Cursor, Disposable, IChangeEvent, IExpr, IPull, ITargets, Txn}
-import de.sciss.lucre.expr.{Context, IControl}
-import de.sciss.lucre.Txn.peer
 import de.sciss.model.Change
-import de.sciss.synth.proc.SoundProcesses
+import de.sciss.proc.SoundProcesses
 
 import scala.concurrent.stm.{Ref, TxnLocal}
 
