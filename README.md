@@ -1,6 +1,6 @@
 # LucrePi
 
-[![Build Status](https://travis-ci.org/Sciss/LucrePi.svg?branch=main)](https://travis-ci.org/Sciss/LucrePi)
+[![Build Status](https://github.com/Sciss/LucrePi/workflows/Scala%20CI/badge.svg?branch=main)](https://github.com/Sciss/LucrePi/actions?query=workflow%3A%22Scala+CI%22)
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/de.sciss/lucrepi_2.13/badge.svg)](https://maven-badges.herokuapp.com/maven-central/de.sciss/lucrepi_2.13)
 
 ## statement
@@ -13,13 +13,13 @@ with absolutely no warranties. To contact the author, send an email to `contact 
 
 ## requirements / building
 
-This project builds with sbt against Scala 2.13, 2.12.
+This project builds with sbt against Scala 2.12, 2.13, Dotty.
 
 To use the library in your project:
 
     "de.sciss" %% "lucrepi" % v
 
-The current version `v` is `"1.2.0"`.
+The current version `v` is `"1.3.0"`.
 
 ## contributing
 
