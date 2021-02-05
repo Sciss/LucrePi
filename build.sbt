@@ -9,7 +9,7 @@ lazy val mimaVersion    = "1.4.0"
 
 lazy val deps = new {
   val main = new {
-    val lucre           = "4.4.1-SNAPSHOT"
+    val lucre           = "4.4.1"
     val soundProcesses  = "4.7.0-SNAPSHOT"
     val pi4j            = "1.3"
   }
@@ -25,7 +25,7 @@ lazy val root = project.withId(baseNameL).in(file("."))
 //    version              := projectVersion,
 //    organization         := "de.sciss",
     scalaVersion         := "2.13.4",
-    crossScalaVersions   := Seq("3.0.0-M3", "2.13.4", "2.12.12"),
+    crossScalaVersions   := Seq("3.0.0-M3", "2.13.4", "2.12.13"),
     description          := "Raspberry Pi GPIO support for Lucre",
     homepage             := Some(url(s"https://git.iem.at/sciss/$gitProject")),
     licenses             := Seq("AGPL v3+" -> url("http://www.gnu.org/licenses/agpl-3.0.txt")),
