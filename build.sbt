@@ -2,15 +2,15 @@ lazy val baseName   = "Lucre-Pi"
 lazy val baseNameL  = baseName.toLowerCase
 lazy val gitProject = "LucrePi"
 
-lazy val projectVersion = "1.4.1-SNAPSHOT"
-lazy val mimaVersion    = "1.4.0"
+lazy val projectVersion = "1.5.0"
+lazy val mimaVersion    = "1.5.0"
 
 // ---- dependencies ----
 
 lazy val deps = new {
   val main = new {
-    val lucre           = "4.4.1"
-    val soundProcesses  = "4.7.0"
+    val lucre           = "4.4.5"
+    val soundProcesses  = "4.8.0"
     val pi4j            = "1.3"
   }
 }
@@ -34,8 +34,8 @@ lazy val root = project.withId(baseNameL).in(file("."))
       "de.sciss"  %% "lucre-expr"           % deps.main.lucre,
       "de.sciss"  %% "soundprocesses-core"  % deps.main.soundProcesses,
       "com.pi4j"  %  "pi4j-core"            % deps.main.pi4j,
-      "com.pi4j"  %  "pi4j-gpio-extension"  % deps.main.pi4j,
-      "com.pi4j"  %  "pi4j-device"          % deps.main.pi4j,
+//      "com.pi4j"  %  "pi4j-gpio-extension"  % deps.main.pi4j,
+//      "com.pi4j"  %  "pi4j-device"          % deps.main.pi4j,
       "de.sciss"  %% "lucre-bdb"            % deps.main.lucre     % Test,
     ),
     scalacOptions ++= Seq("-deprecation", "-unchecked", "-feature", "-encoding", "utf8", "-Xlint", "-Xsource:2.13"),
