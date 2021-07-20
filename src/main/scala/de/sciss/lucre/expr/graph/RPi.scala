@@ -2,7 +2,7 @@
  *  RPi.scala
  *  (LucrePi)
  *
- *  Copyright (c) 2020 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2020-2021 Hanns Holger Rutz. All rights reserved.
  *
  *	This software is published under the GNU Affero General Public License v3+
  *
@@ -15,6 +15,7 @@ package de.sciss.lucre.expr.graph
 
 import com.pi4j.io.gpio.{RaspiPin, Pin => JPin}
 import de.sciss.lucre.expr.Context
+import de.sciss.lucre.expr.ExElem.{ProductReader, RefMapIn}
 import de.sciss.lucre.expr.graph.impl.MappedIExpr
 import de.sciss.lucre.{IExpr, ITargets, Txn}
 import de.sciss.numbers.Implicits._
@@ -61,6 +62,14 @@ object RPi {
         case 30 => RaspiPin.GPIO_30
         case 31 => RaspiPin.GPIO_31
       }
+  }
+
+  object Pin extends ProductReader[Pin] {
+    override def read(in: RefMapIn, key: String, arity: Int, adj: Int): Pin = {
+      require (arity == 1 && adj == 0)
+      val _index  = in.readEx[Int]()
+      Pin(_index)
+    }
   }
 
   /** A pin on the Raspberry Pi GPIO.

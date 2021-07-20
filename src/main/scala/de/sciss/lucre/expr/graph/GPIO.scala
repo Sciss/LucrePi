@@ -2,7 +2,7 @@
  *  GPIO.scala
  *  (LucrePi)
  *
- *  Copyright (c) 2020 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2020-2021 Hanns Holger Rutz. All rights reserved.
  *
  *	This software is published under the GNU Affero General Public License v3+
  *
@@ -17,7 +17,8 @@ import com.pi4j.io.gpio.event.{GpioPinDigitalStateChangeEvent, GpioPinListenerDi
 import com.pi4j.io.gpio.{GpioController, GpioFactory, GpioPinDigitalInput, GpioPinDigitalOutput, GpioProvider, PinPullResistance, PinState, Pin => JPin}
 import de.sciss.equal.Implicits._
 import de.sciss.lucre.Txn.peer
-import de.sciss.lucre.expr.{Context, IControl}
+import de.sciss.lucre.expr.ExElem.ProductReader
+import de.sciss.lucre.expr.{Context, ExElem, IControl}
 import de.sciss.lucre.impl.IChangeGeneratorEvent
 import de.sciss.lucre.{Cursor, Disposable, IChangeEvent, IExpr, IPull, ITargets, Txn}
 import de.sciss.model.Change
@@ -84,9 +85,16 @@ object GPIO {
     }
   }
 
-  object DigitalOut {
+  object DigitalOut extends ProductReader[DigitalOut] {
     /** Creates a digital output on the given pin reflecting the given low/high state. */
     def apply(pin: Pin, state: Ex[Boolean]): DigitalOut = Impl(pin, state)
+
+    override def read(in: ExElem.RefMapIn, key: String, arity: Int, adj: Int): DigitalOut = {
+      require (arity == 2 && adj == 0)
+      val _pin      = in.readProductT[Pin]()
+      val _state    = in.readEx[Boolean]()
+      DigitalOut(_pin, _state)
+    }
 
     private final case class Impl(pin: Pin, state: Ex[Boolean]) extends DigitalOut {
       override def productPrefix: String = s"GPIO$$DigitalOut" // serialization
@@ -177,7 +185,7 @@ object GPIO {
   val PullDown: Ex[Option[Boolean]] = Some(false)
   val PullOff : Ex[Option[Boolean]] = None
 
-  object DigitalIn {
+  object DigitalIn extends ProductReader[DigitalIn] {
     /** Creates a digital input on the given pin. It can be used to attach and listen to
       * buttons on the GPIO, for example.
       *
@@ -194,6 +202,15 @@ object GPIO {
       */
     def apply(pin: Pin, pull: Ex[Option[Boolean]] = None, init: Ex[Boolean] = false, debounce: Ex[Int] = -1): DigitalIn =
       Impl(pin, pull, init, debounce)
+
+    override def read(in: ExElem.RefMapIn, key: String, arity: Int, adj: Int): DigitalIn = {
+      require (arity == 4 && adj == 0)
+      val _pin      = in.readProductT[Pin]()
+      val _pull     = in.readEx[Option[Boolean]]()
+      val _init     = in.readEx[Boolean]()
+      val _debounce = in.readEx[Int]()
+      DigitalIn(_pin, _pull, _init, _debounce)
+    }
 
     private final case class Impl(pin: Pin, pull: Ex[Option[Boolean]], init: Ex[Boolean], debounce: Ex[Int])
       extends DigitalIn {
