@@ -1,2 +1,2 @@
-addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "0.9.2")  // binary compatibility testing
+addSbtPlugin("com.typesafe" % "sbt-mima-plugin" % "1.0.0")  // binary compatibility testing
 

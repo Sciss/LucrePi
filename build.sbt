@@ -2,16 +2,16 @@ lazy val baseName   = "Lucre-Pi"
 lazy val baseNameL  = baseName.toLowerCase
 lazy val gitProject = "LucrePi"
 
-lazy val projectVersion = "1.5.1"
-lazy val mimaVersion    = "1.5.0"
+lazy val projectVersion = "1.6.0-SNAPSHOT"
+lazy val mimaVersion    = "1.6.0"
 
 // ---- dependencies ----
 
 lazy val deps = new {
   val main = new {
-    val lucre           = "4.4.5"
-    val soundProcesses  = "4.8.0"
-    val pi4j            = "1.3"
+    val lucre           = "4.5.0-SNAPSHOT"
+    val soundProcesses  = "4.9.0-SNAPSHOT"
+    val pi4j            = "1.4"
   }
 }
 
@@ -23,7 +23,7 @@ lazy val root = project.withId(baseNameL).in(file("."))
   .settings(
     name                 := baseName,
     scalaVersion         := "2.13.6",
-    crossScalaVersions   := Seq("3.0.0", "2.13.6", "2.12.14"),
+    crossScalaVersions   := Seq("3.0.2", "2.13.6", "2.12.15"),
     description          := "Raspberry Pi GPIO support for Lucre",
     homepage             := Some(url(s"https://github.com/Sciss/$gitProject")),
     licenses             := Seq("AGPL v3+" -> url("http://www.gnu.org/licenses/agpl-3.0.txt")),
