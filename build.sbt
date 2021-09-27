@@ -9,7 +9,7 @@ lazy val mimaVersion    = "1.6.0"
 
 lazy val deps = new {
   val main = new {
-    val lucre           = "4.5.0-SNAPSHOT"
+    val lucre           = "4.5.0"
     val soundProcesses  = "4.9.0-SNAPSHOT"
     val pi4j            = "1.4"
   }
