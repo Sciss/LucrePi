@@ -2,15 +2,15 @@ lazy val baseName   = "Lucre-Pi"
 lazy val baseNameL  = baseName.toLowerCase
 lazy val gitProject = "LucrePi"
 
-lazy val projectVersion = "1.8.0"
-lazy val mimaVersion    = "1.8.0"
+lazy val projectVersion = "1.9.0"
+lazy val mimaVersion    = "1.9.0"
 
 // ---- dependencies ----
 
 lazy val deps = new {
   val main = new {
     val lucre           = "4.5.1"
-    val soundProcesses  = "4.11.0"
+    val soundProcesses  = "4.12.0"
     val pi4j            = "1.4"
   }
 }
