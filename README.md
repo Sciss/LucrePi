@@ -7,7 +7,7 @@
 
 LucrePi is a Scala library which bridges between the Raspberry Pi GPIO (through 
 the [Pi4j](https://github.com/Pi4J/pi4j/) project) and [Lucre](https://github.com/Sciss/Lucre/).
-It is (C)opyright 2020–2021 by Hanns Holger Rutz. All rights reserved. The project is released under
+It is (C)opyright 2020–2022 by Hanns Holger Rutz. All rights reserved. The project is released under
 the [GNU Affero General Public License](https://github.com/Sciss/LucrePi/raw/main/LICENSE) v2.1+ and comes 
 with absolutely no warranties. To contact the author, send an e-mail to `contact at sciss.de`.
 
