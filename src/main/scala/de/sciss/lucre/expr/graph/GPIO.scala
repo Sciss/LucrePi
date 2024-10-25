@@ -15,12 +15,14 @@ package de.sciss.lucre.expr.graph
 
 import com.pi4j.io.gpio.event.{GpioPinDigitalStateChangeEvent, GpioPinListenerDigital}
 import com.pi4j.io.gpio.{GpioController, GpioFactory, GpioPinDigitalInput, GpioPinDigitalOutput, GpioProvider, PinPullResistance, PinState, Pin => JPin}
+import com.pi4j.io.i2c.{I2CBus, I2CDevice, I2CFactory}
 import de.sciss.equal.Implicits._
 import de.sciss.lucre.Txn.peer
-import de.sciss.lucre.expr.ExElem.ProductReader
-import de.sciss.lucre.expr.{Context, ExElem, IControl}
+import de.sciss.lucre.expr.ExElem.{ProductReader, RefMapIn}
+import de.sciss.lucre.expr.impl.IActionImpl
+import de.sciss.lucre.expr.{Context, ExElem, IAction, IControl, ITrigger}
 import de.sciss.lucre.impl.IChangeGeneratorEvent
-import de.sciss.lucre.{Cursor, Disposable, IChangeEvent, IExpr, IPull, ITargets, Txn}
+import de.sciss.lucre.{Cursor, Disposable, IChangeEvent, IEvent, IExpr, IPull, ITargets, Txn}
 import de.sciss.model.Change
 import de.sciss.proc.SoundProcesses
 
@@ -234,4 +236,260 @@ object GPIO {
   }
 
   trait Pin extends Ex[JPin]
+
+  // ---------- ADS1X15 ----------
+
+  object ADS1X15 extends ProductReader[ADS1X15] {
+    /**
+      * @param bus      i2c bus (default is 1)
+      * @param address  i2c address (default is 0x48)
+      * @param bits     16 for the ADS1115, 12 for the ADS1015 (default is 16)
+      */
+    def apply(bus: Ex[Int] = 1, address: Ex[Int] = 0x48, bits: Ex[Int] = 16): ADS1X15 =
+      Impl(bus = bus, address = address, bits = bits)
+
+    override def read(in: ExElem.RefMapIn, key: String, arity: Int, adj: Int): ADS1X15 = {
+      require (arity == 3 && adj == 0)
+      val _bus      = in.readEx[Int]()
+      val _address  = in.readEx[Int]()
+      val _bits     = in.readEx[Int]()
+      ADS1X15(_bus, _address, _bits)
+    }
+
+//    object Received extends ProductReader[Received] {
+//      override def read(in: RefMapIn, key: String, arity: Int, adj: Int): Received = {
+//        require (arity == 1 && adj == 0)
+//        val _a = in.readProductT[ADS1X15]()
+//        new Received(_a)
+//      }
+//    }
+//    final case class Received(a: ADS1X15) extends Trig {
+//      type Repr[T <: Txn[T]] = ITrigger[T]
+//
+//      override def productPrefix = s"GPIO$$ADS1X15$$Received"   // serialization
+//
+//      protected def mkRepr[T <: Txn[T]](implicit ctx: Context[T], tx: T): Repr[T] = {
+//        val ns = a.expand[T]
+//        import ctx.targets
+//        new ReceivedExpanded[T](ns, tx)
+//      }
+//    }
+
+    object RunSingle extends ProductReader[RunSingle] {
+      override def read(in: RefMapIn, key: String, arity: Int, adj: Int): RunSingle = {
+        assert (arity == 2 && adj == 0)
+        val _a    = in.readProductT[ADS1X15]()
+        val _chan = in.readEx[Int]()
+        new RunSingle(_a, _chan)
+      }
+    }
+    final case class RunSingle(a: ADS1X15, chan: Ex[Int]) extends Act with Trig {
+      type Repr[T <: Txn[T]] = IAction[T] with ITrigger[T]
+
+      override def productPrefix: String = s"GPIO$$ADS1X15$$RunSingle" // serialization
+
+      protected def mkRepr[T <: Txn[T]](implicit ctx: Context[T], tx: T): Repr[T] = {
+        val ax      = a.expand[T]
+        val chanEx  = chan.expand[T]
+        new ExpandedRunSingle[T](ax, chanEx)
+      }
+    }
+
+    private final class ExpandedRunSingle[T <: Txn[T]](a: ADS1X15.Repr[T], chan: IExpr[T, Int])
+      extends IActionImpl[T] with ITrigger[T] {
+
+      override def executeAction()(implicit tx: T): Unit = {
+        val chanV = chan.value
+        if (chanV >= 0 && chanV < 4) a.runSingle(chanV)
+      }
+
+      override def changed: IEvent[T, Unit] = ???
+    }
+
+    object In extends ProductReader[In] {
+      override def read(in: RefMapIn, key: String, arity: Int, adj: Int): In = {
+        require (arity == 2 && adj == 0)
+        val _a    = in.readProductT[ADS1X15]()
+        val _chan = in.readEx[Int]()
+        new In(_a, _chan)
+      }
+    }
+    final case class In(a: ADS1X15, chan: Ex[Int]) extends Ex[Int] {
+      type Repr[T <: Txn[T]] = IExpr[T, Int]
+
+      override def productPrefix = s"OscUdpNode$$Sender"   // serialization
+
+      protected def mkRepr[T <: Txn[T]](implicit ctx: Context[T], tx: T): Repr[T] = {
+        val ax = a.expand[T]
+        import ctx.targets
+        ??? // new InExpanded(ax, tx)
+      }
+    }
+
+    private final case class Impl(bus: Ex[Int], address: Ex[Int], bits: Ex[Int]) extends ADS1X15 {
+      override def productPrefix: String = s"GPIO$$ADS1X15" // serialization
+
+//      override def received         : Trig    = Received(this)
+
+      override def runSingle(chan: Ex[Int]): Act with Trig = RunSingle(this, chan)
+
+      override def in(chan: Ex[Int]): Ex[Int] = In(this, chan)
+
+      protected def mkRepr[T <: Txn[T]](implicit ctx: Context[T], tx: T): Repr[T] =
+        new ExpandedADS1X15[T](bus = bus.expand[T], address = address.expand[T], bits = bits.expand[T])
+    }
+
+    trait Repr[T <: Txn[T]] extends IControl[T] {
+//      def message(implicit tx: T): osc.Message
+//      def sender (implicit tx: T): PeerSocketAddress
+
+      def runSingle(chan: Int)(implicit tx: T): Unit
+
+//      def received: IChangeEvent[T, (osc.Message, PeerSocketAddress)]
+    }
+  }
+  trait ADS1X15 extends Control {
+    type Repr[T <: Txn[T]] = ADS1X15.Repr[T]
+
+//    /** Triggers when a conversion is completed. */
+//    def received(chan: Ex[Int]): Trig
+
+    /** Runs a single conversion on all pins. The trigger is fired when conversion is complete. */
+    def runSingle(chan: Ex[Int]): Act with Trig
+
+    /** The last conversion at a given analog input. */
+    def in(chan: Ex[Int]): Ex[Int]
+  }
+
+  // -----
+  // implementation based on `Adafruit_ADS1X15`, licensed under BSD License:
+  // Copyright (c) 2012, Adafruit Industries, all rights reserved.
+  // -----
+
+  private final val ADS1X15_REG_POINTER_CONFIG      = 0x01  // Configuration
+  private final val ADS1X15_REG_POINTER_LOWTHRESH   = 0x02  // Low threshold
+  private final val ADS1X15_REG_POINTER_HITHRESH    = 0x03  // High threshold
+  private final val ADS1X15_REG_POINTER_CONVERT     = 0x00  // Conversion
+
+//  private final val ADS1X15_REG_CONFIG_CQUE_1CONV   = 0x0000 // Assert ALERT/RDY after one conversions
+//  private final val ADS1X15_REG_CONFIG_CLAT_NONLAT  = 0x0000 // Non-latching comparator (default)
+//  private final val ADS1X15_REG_CONFIG_CPOL_ACTVLOW = 0x0000 // ALERT/RDY pin is low when active (default)
+//  private final val ADS1X15_REG_CONFIG_CMODE_TRAD   = 0x0000 // Traditional comparator with hysteresis (default)
+  private final val ADS1X15_REG_CONFIG_MODE_CONTIN  = 0x0000 // Continuous conversion mode
+  private final val ADS1X15_REG_CONFIG_MODE_SINGLE  = 0x0100 // Power-down single-shot mode (default)
+  private final val ADS1X15_REG_CONFIG_OS_SINGLE    = 0x8000 // Write: Set to start a single-conversion
+
+//  private final val ADS1X15_REG_CONFIG_MUX_SINGLE_0 = 0x4000 // Single-ended AIN0
+//  private final val ADS1X15_REG_CONFIG_MUX_SINGLE_1 = 0x5000 // Single-ended AIN1
+//  private final val ADS1X15_REG_CONFIG_MUX_SINGLE_2 = 0x6000 // Single-ended AIN2
+//  private final val ADS1X15_REG_CONFIG_MUX_SINGLE_3 = 0x7000 // Single-ended AIN3
+
+  private final val ADS1X15_REG_CONFIG_PGA_6_144V   = 0x0000 // +/-6.144V range = Gain 2/3
+
+  private final val RATE_ADS1015_1600SPS            = 0x0080 // 1600 samples per second (default)
+  private final val RATE_ADS1115_128SPS             = 0x0080 //  128 samples per second (default)
+
+  private final class ExpandedADS1X15[T <: Txn[T]](bus: IExpr[T, Int], address: IExpr[T, Int], bits: IExpr[T, Int])
+    extends ADS1X15.Repr[T] {
+
+//    private[this] val obsRef  = Ref(Disposable.empty[T])
+
+    private[this] val gain      = ADS1X15_REG_CONFIG_PGA_6_144V    // GAIN_TWOTHIRDS - +/- 6.144V range (limited to VDD +0.3V max!)
+    private[this] var bitShift  = 0
+    private[this] var dataRate  = 0
+
+    @volatile
+    private[this] var i2cBus    = null: I2CBus
+    @volatile
+    private[this] var i2cDev    = null: I2CDevice
+
+    private[this] val values    = new Array[Int](4)
+
+    override def runSingle(chan: Int)(implicit tx: T): Unit =
+      tx.afterCommit {
+        val mux = (chan + 4) << 12  // 0x4000, 0x5000 etc.
+        startADCReading(mux, continuous = false)
+        // Wait for the conversion to complete
+        while (!conversionComplete()) ()
+        val value = getLastConversionResults()
+        values(value)
+      }
+
+    private def getLastConversionResults(): Int = {
+      // Read the conversion results
+      val res = readRegister(ADS1X15_REG_POINTER_CONVERT) >> bitShift
+      if (bitShift == 0 || res <= 0x07FF) {
+        res
+      } else {
+        // Shift 12-bit results right 4 bits for the ADS1015,
+        // making sure we keep the sign bit intact
+        // negative number - extend the sign to 16th bit
+        res | 0xF000
+      }
+    }
+
+    private def startADCReading(mux: Int, continuous: Boolean): Unit = {
+      // Start with default values
+      val config =
+//        ADS1X15_REG_CONFIG_CQUE_1CONV |   // Set CQUE to any value other than
+//          // None so we can use it in RDY mode
+//          ADS1X15_REG_CONFIG_CLAT_NONLAT |  // Non-latching (default val)
+//          ADS1X15_REG_CONFIG_CPOL_ACTVLOW | // Alert/Rdy active low   (default val)
+//          ADS1X15_REG_CONFIG_CMODE_TRAD     // Traditional comparator (default val)
+        (if (continuous) ADS1X15_REG_CONFIG_MODE_CONTIN else ADS1X15_REG_CONFIG_MODE_SINGLE) | gain | dataRate | mux | ADS1X15_REG_CONFIG_OS_SINGLE
+
+      // Write config register to the ADC
+      writeRegister(ADS1X15_REG_POINTER_CONFIG    , config)
+      // Set ALERT/RDY to RDY mode.
+      writeRegister(ADS1X15_REG_POINTER_HITHRESH  , 0x8000)
+      writeRegister(ADS1X15_REG_POINTER_LOWTHRESH , 0x0000)
+    }
+
+    private def conversionComplete(): Boolean =
+      (readRegister(ADS1X15_REG_POINTER_CONFIG) & 0x8000) != 0
+
+    private def readRegister(reg: Int): Int = {
+      val arr = new Array[Byte](2)
+      i2cDev.write(reg.toByte)
+      i2cDev.read (arr, 0, 2)
+      ((arr(0) & 0xFF) << 8) | (arr(1) & 0xFF)
+    }
+
+    private def writeRegister(reg: Int, value: Int): Unit = {
+      val arr = new Array[Byte](3)
+      arr(0) = reg.toByte
+      arr(1) = (value >> 8).toByte
+      arr(2) = (value & 0xFF).toByte
+      i2cDev.write(arr)
+    }
+
+    def initControl()(implicit tx: T): Unit = {
+      val busV      = bus     .value
+      val addressV  = address .value
+      val bitsV     = bits    .value
+
+      bitShift    = 16 - bitsV
+      if (bitsV == 12) {
+        dataRate  = RATE_ADS1015_1600SPS
+      } else {
+        if (bitsV != 16) Console.err.println(s"Warning: ADS1X15 number of bits ($bitsV) must be 12 or 16")
+        dataRate  = RATE_ADS1115_128SPS
+      }
+
+      tx.afterCommit {
+        i2cBus = I2CFactory.getInstance(busV)
+        i2cDev = i2cBus.getDevice(addressV)
+      }
+    }
+
+    def dispose()(implicit tx: T): Unit = {
+//      obsRef().dispose()
+      tx.afterCommit {
+        val _i2cBus = i2cBus
+        if (_i2cBus != null) {
+          _i2cBus.close()
+        }
+      }
+    }
+  }
 }
