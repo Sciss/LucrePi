@@ -21,12 +21,12 @@ import de.sciss.lucre.Txn.peer
 import de.sciss.lucre.expr.ExElem.{ProductReader, RefMapIn}
 import de.sciss.lucre.expr.impl.IActionImpl
 import de.sciss.lucre.expr.{Context, ExElem, IAction, IControl, ITrigger}
-import de.sciss.lucre.impl.IChangeGeneratorEvent
+import de.sciss.lucre.impl.{IChangeEventImpl, IChangeGeneratorEvent, IEventImpl, IGeneratorEvent}
 import de.sciss.lucre.{Cursor, Disposable, IChangeEvent, IEvent, IExpr, IPull, ITargets, Txn}
 import de.sciss.model.Change
 import de.sciss.proc.SoundProcesses
 
-import scala.concurrent.stm.{Ref, TxnLocal}
+import scala.concurrent.stm.{Ref, TArray, TxnLocal}
 
 object GPIO {
   private lazy val provider: GpioProvider   = GpioFactory.getDefaultProvider()
@@ -291,19 +291,38 @@ object GPIO {
       protected def mkRepr[T <: Txn[T]](implicit ctx: Context[T], tx: T): Repr[T] = {
         val ax      = a.expand[T]
         val chanEx  = chan.expand[T]
-        new ExpandedRunSingle[T](ax, chanEx)
+        import ctx.targets
+        new ExpandedRunSingle[T](ax, chanEx, tx)
       }
     }
 
-    private final class ExpandedRunSingle[T <: Txn[T]](a: ADS1X15.Repr[T], chan: IExpr[T, Int])
-      extends IActionImpl[T] with ITrigger[T] {
+    private final class ExpandedRunSingle[T <: Txn[T]](a: ADS1X15.Repr[T], chan: IExpr[T, Int], tx0: T)
+                                                      (implicit protected val targets: ITargets[T])
+      extends IActionImpl[T] with ITrigger[T] with IEventImpl[T, Unit] {
+
+      private final val chanRef = Ref(-1)
+
+      a.received.--->(changed)(tx0)
 
       override def executeAction()(implicit tx: T): Unit = {
         val chanV = chan.value
-        if (chanV >= 0 && chanV < 4) a.runSingle(chanV)
+        if (chanV >= 0 && chanV < 4) {
+          chanRef() = chanV
+          a.runSingle(chanV)
+        }
       }
 
-      override def changed: IEvent[T, Unit] = ???
+      override def dispose()(implicit tx: T): Unit = {
+        a.received.-/->(changed)
+        super.dispose()
+      }
+
+      override def changed: IEvent[T, Unit] = this
+
+      override private[lucre] def pullUpdate(pull: IPull[T])(implicit tx: T): Option[Unit] = {
+        val opt = pull(a.received)
+        if (opt.isDefined) Trig.Some else None  // XXX TODO is this correct?
+      }
     }
 
     object In extends ProductReader[In] {
@@ -320,10 +339,30 @@ object GPIO {
       override def productPrefix = s"OscUdpNode$$Sender"   // serialization
 
       protected def mkRepr[T <: Txn[T]](implicit ctx: Context[T], tx: T): Repr[T] = {
-        val ax = a.expand[T]
+        val ax      = a.expand[T]
+        val chanEx  = chan.expand[T]
         import ctx.targets
-        ??? // new InExpanded(ax, tx)
+        new InExpanded(ax, chanEx, tx)
       }
+    }
+
+    private final class InExpanded[T <: Txn[T]](a: Repr[T], chan: IExpr[T, Int], tx0: T)
+                                               (implicit protected val targets: ITargets[T])
+      extends IExpr[T, Int] with IChangeEventImpl[T, Int] {
+
+      a.received.--->(changed)(tx0)
+
+      def value(implicit tx: T): Int = a.in(chan.value)
+
+      private[lucre] def pullChange(pull: IPull[T])(implicit tx: T, phase: IPull.Phase): Int = {
+        /*val opt =*/ pull(a.received)
+        a.in(chan.value) // XXX TODO is this correct?
+      }
+
+      def dispose()(implicit tx: T): Unit =
+        a.received.-/->(changed)
+
+      def changed: IChangeEvent[T, Int] = this
     }
 
     private final case class Impl(bus: Ex[Int], address: Ex[Int], bits: Ex[Int]) extends ADS1X15 {
@@ -335,17 +374,18 @@ object GPIO {
 
       override def in(chan: Ex[Int]): Ex[Int] = In(this, chan)
 
-      protected def mkRepr[T <: Txn[T]](implicit ctx: Context[T], tx: T): Repr[T] =
+      protected def mkRepr[T <: Txn[T]](implicit ctx: Context[T], tx: T): Repr[T] = {
+        import ctx.{cursor, targets}
         new ExpandedADS1X15[T](bus = bus.expand[T], address = address.expand[T], bits = bits.expand[T])
+      }
     }
 
     trait Repr[T <: Txn[T]] extends IControl[T] {
-//      def message(implicit tx: T): osc.Message
-//      def sender (implicit tx: T): PeerSocketAddress
+      def in(chan: Int)(implicit tx: T): Int
 
       def runSingle(chan: Int)(implicit tx: T): Unit
 
-//      def received: IChangeEvent[T, (osc.Message, PeerSocketAddress)]
+      def received: IEvent[T, (Int, Int)]
     }
   }
   trait ADS1X15 extends Control {
@@ -354,7 +394,7 @@ object GPIO {
 //    /** Triggers when a conversion is completed. */
 //    def received(chan: Ex[Int]): Trig
 
-    /** Runs a single conversion on all pins. The trigger is fired when conversion is complete. */
+    /** Runs a single conversion on a given channel. The trigger is fired when conversion is complete. */
     def runSingle(chan: Ex[Int]): Act with Trig
 
     /** The last conversion at a given analog input. */
@@ -390,7 +430,8 @@ object GPIO {
   private final val RATE_ADS1115_128SPS             = 0x0080 //  128 samples per second (default)
 
   private final class ExpandedADS1X15[T <: Txn[T]](bus: IExpr[T, Int], address: IExpr[T, Int], bits: IExpr[T, Int])
-    extends ADS1X15.Repr[T] {
+                                                  (implicit protected val targets: ITargets[T], cursor: Cursor[T])
+    extends ADS1X15.Repr[T] with IGeneratorEvent[T, (Int, Int)] {
 
 //    private[this] val obsRef  = Ref(Disposable.empty[T])
 
@@ -403,7 +444,10 @@ object GPIO {
     @volatile
     private[this] var i2cDev    = null: I2CDevice
 
-    private[this] val values    = new Array[Int](4)
+    private[this] val _values   = TArray.ofDim[Int](4) // new Array[Int](4)
+
+    override def in(chan: Int)(implicit tx: T): Int =
+      if (chan >= 0 && chan < 4) _values(chan) else 0
 
     override def runSingle(chan: Int)(implicit tx: T): Unit =
       tx.afterCommit {
@@ -412,8 +456,17 @@ object GPIO {
         // Wait for the conversion to complete
         while (!conversionComplete()) ()
         val value = getLastConversionResults()
-        values(value)
+//        _values(chan) = value
+        SoundProcesses.step[T]("ADS1X15.runSingle") { implicit tx =>
+          _values(chan) = value
+          fire((chan, value))
+        }
       }
+
+    override private[lucre] def pullUpdate(pull: IPull[T])(implicit tx: T): Option[(Int, Int)] =
+      Some(pull.resolve[(Int, Int)])
+
+    override def received: IEvent[T, (Int, Int)] = this
 
     private def getLastConversionResults(): Int = {
       // Read the conversion results
